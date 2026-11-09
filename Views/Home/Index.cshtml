@@ -1,0 +1,120 @@
+@{
+    ViewData["Title"] = "Câmera e reconhecimento de sinais";
+    var guideLetters = new[] { "A", "B", "C", "Ç", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z" };
+    var supportedLetters = new HashSet<string> { "A", "B", "C", "D", "E", "F", "G", "I", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W" };
+    var movingLetters = new HashSet<string> { "Ç", "H", "J", "K", "X", "Y", "Z" };
+}
+
+<main class="shell">
+    <header class="topbar">
+        <a class="brand" asp-controller="Home" asp-action="Index" aria-label="Libras AI início"><span class="brand-mark">L</span><span>Libras <b>AI</b></span></a>
+        <span class="prototype"><i></i> PROTÓTIPO ABERTO</span>
+    </header>
+
+    <section class="intro">
+        <div class="eyebrow">LIBRAS · RECONHECIMENTO AUTOMÁTICO</div>
+        <h1>Soletração ao vivo.<br /><span>As letras viram texto.</span></h1>
+        <p>Mostre até duas letras do alfabeto manual para a câmera. O modelo reconhece as mãos ao mesmo tempo e monta o texto.</p>
+    </section>
+
+    <section class="workspace" aria-label="Reconhecimento de sinais">
+        <div class="camera-column">
+            <div class="section-heading"><div><span class="step">01</span><h2>Câmera</h2></div><span class="live-status" id="cameraStatus"><i></i> CÂMERA DESLIGADA</span></div>
+            <div class="camera-frame" id="cameraFrame">
+                <video id="video" playsinline muted></video>
+                <canvas id="overlay"></canvas>
+                <div class="camera-placeholder" id="cameraPlaceholder">
+                    <div class="camera-icon">◉</div>
+                    <strong>Sua câmera aparece aqui</strong>
+                    <span>Enquadre as mãos inteiras, com boa iluminação.</span>
+                </div>
+                <div class="camera-corner corner-tl"></div><div class="camera-corner corner-tr"></div>
+                <div class="camera-corner corner-bl"></div><div class="camera-corner corner-br"></div>
+                <span class="camera-hint" id="cameraHint">Aguardando câmera</span>
+                <div class="camera-guide" id="cameraGuide" aria-hidden="true"><span></span><span></span></div>
+            </div>
+            <div class="camera-actions">
+                <button class="button button-primary" id="cameraButton" type="button"><span class="button-icon">◉</span> Ativar câmera</button>
+                <p>O vídeo é processado no seu navegador.</p>
+            </div>
+
+            <div class="learn-card">
+                <div class="section-heading"><div><span class="step">02</span><h2>Monte palavras</h2></div><span class="sample-count" id="modelStatus">CARREGANDO MODELO</span></div>
+                <div class="learn-note"><span>✳</span><p>Enquadre a mão inteira, aproxime-a até os dedos ficarem nítidos e mantenha-a parada por um instante. Com duas mãos, as duas letras são adicionadas juntas quando estiverem estáveis. Afaste as mãos entre palavras para inserir um espaço.</p></div>
+                <div class="manage-row"><span class="supported-letters">Reconhecimento automático: A B C D E F G I K L M N O P Q R S T U V W</span></div>
+                <div class="dynamic-lab" aria-labelledby="dynamicTitle">
+                    <div class="dynamic-lab-heading"><div><span class="eyebrow">LETRAS COM MOVIMENTO</span><h3 id="dynamicTitle">Ç, H, J, K, X, Y e Z</h3></div><span class="dynamic-count" id="dynamicCount">CARREGANDO EXEMPLOS</span></div>
+                    <p>Ative este modo para analisar movimentos sem misturá-los às letras estáticas. Grave pelo menos 5 exemplos variados de cada sinal, mantendo a mão inteira no quadro e pausando ao terminar o gesto.</p>
+                    <div class="dynamic-mode-control"><button class="button button-dynamic-toggle" id="dynamicModeToggle" type="button" aria-pressed="false">Ativar letras com movimento</button><span id="dynamicModeState">DESATIVADO · reconhecimento estático</span></div>
+                    <div class="dynamic-controls">
+                        <label for="dynamicLetter">Letra</label>
+                        <select id="dynamicLetter" aria-label="Letra dinâmica para gravar"><option>Ç</option><option>H</option><option>J</option><option>K</option><option>X</option><option>Y</option><option>Z</option></select>
+                        <label for="dynamicSide">Mão</label>
+                        <select id="dynamicSide" aria-label="Mão usada no exemplo"><option value="Right">Direita</option><option value="Left">Esquerda</option></select>
+                        <button class="button button-secondary" id="recordDynamicButton" type="button" disabled>● Gravar exemplo</button>
+                    </div>
+                    <div class="dynamic-status" id="dynamicStatus" role="status" aria-live="polite">Ative a câmera para gravar um exemplo.</div>
+                    <div class="dynamic-data-controls">
+                        <button class="text-button" id="exportDynamicButton" type="button">Baixar exemplos JSON</button>
+                        <label class="text-button import-dynamic-label" for="importDynamicInput">Importar exemplos JSON</label>
+                        <input id="importDynamicInput" type="file" accept="application/json,.json" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <aside class="result-column">
+            <div class="result-card">
+                <div class="section-heading"><div><span class="step">03</span><h2>Reconhecimento</h2></div><span class="ai-badge">✦ IA</span></div>
+                <div class="translation-box" aria-live="polite"><span class="translation-label">SINAL RECONHECIDO</span><strong id="translation">—</strong><span class="confidence" id="confidence">Ative a câmera para começar</span></div>
+                <div class="confidence-track"><span id="confidenceBar"></span></div>
+                <div class="result-controls"><button class="button button-secondary" id="speakButton" type="button" disabled>🔊 Ouvir texto</button><button class="button button-quiet" id="spaceButton" type="button">␣ Espaço</button><button class="button button-quiet" id="deleteButton" type="button">⌫ Apagar letra</button></div>
+                <div class="phrase-area"><div class="phrase-head"><span>TEXTO SOLETRADO</span><button class="text-button" id="clearPhrase" type="button">Limpar</button></div><textarea id="phrase" rows="3" placeholder="As letras reconhecidas vão aparecer aqui." aria-label="Texto montado com letras soletradas"></textarea></div>
+            </div>
+            <div class="tip-card"><span class="tip-icon">✦</span><div><strong>As duas mãos no quadro</strong><p>A câmera acompanha duas mãos e estima uma letra para cada uma usando o classificador do alfabeto.</p></div></div>
+        </aside>
+    </section>
+
+    <section class="hand-guide" id="guia-alfabeto" aria-labelledby="guideTitle">
+        <div class="guide-heading">
+            <div>
+                <div class="eyebrow">CONSULTE ENQUANTO PRATICA</div>
+                <h2 id="guideTitle">Exemplos de mãos</h2>
+                <p>Compare a configuração da mão com a referência. Toque em uma letra para ampliar.</p>
+            </div>
+            <span class="guide-count">27 REFERÊNCIAS · 21 RECONHECIDAS</span>
+        </div>
+        <div class="hand-guide-grid">
+            @foreach (var letter in guideLetters)
+            {
+                var imageName = letter == "Ç" ? "cedilha" : letter;
+                var imagePath = Url.Content("~/img/alfabeto/" + imageName + ".png");
+                var isSupported = supportedLetters.Contains(letter);
+                var hasMovement = movingLetters.Contains(letter);
+                <button class="letter-example @(isSupported ? "supported" : "reference-only")" type="button" data-letter="@letter" data-image="@imagePath" data-supported="@isSupported.ToString().ToLowerInvariant()" aria-label="Ampliar exemplo da letra @letter">
+                    <img src="@imagePath" alt="Exemplo ilustrado da letra @letter, recortado do quadro de referência" loading="lazy" />
+                    <span class="letter-example-label">@letter</span>
+                    <span class="letter-example-status">@(isSupported && hasMovement ? "Pose reconhecida · movimento treinável" : isSupported ? "Reconhecida pela câmera" : hasMovement ? "Sinal com movimento" : "Apenas referência")</span>
+                </button>
+            }
+        </div>
+        <p class="guide-footnote">Os cartões foram recortados do quadro ilustrativo enviado para este projeto. Referência identificada: <a href="https://www.todamateria.com.br/alfabeto-em-libras-conheca-todas-as-letras-para-imprimir/" target="_blank" rel="noopener noreferrer">Márcia Fernandes, Toda Matéria ↗</a>. As 21 poses estáticas são reconhecidas diretamente. Ç, H, J, K, X, Y e Z podem ser treinadas no modo de movimento acima.</p>
+    </section>
+
+    <section class="vocabulary-card" aria-labelledby="vocabularyTitle">
+        <div><div class="eyebrow">APRENDIZADO DE VOCABULÁRIO</div><h2 id="vocabularyTitle">Além de soletrar, aprenda sinais</h2><p>A página indicada reúne exemplos ilustrados de “lei”, “e-mail”, “chuva”, “calor”, “frio”, “Libras”, “triste” e “amigo”. Abra o material original para ver as ilustrações e o contexto.</p></div>
+        <a class="button button-secondary vocabulary-link" href="https://www.libras.com.br/exemplos-de-sinais-em-libras" target="_blank" rel="noopener noreferrer">Ver exemplos no Libras.com.br ↗</a>
+        <small>Referência externa: Almir Cristiano, Libras.com.br. Os sinais de vocabulário ainda não são reconhecidos pela câmera deste protótipo.</small>
+    </section>
+
+    <section class="notice"><span class="notice-icon">i</span><p><strong>Escopo do protótipo.</strong> O modo estático classifica cada mão separadamente e só confirma uma letra quando há confiança, diferença clara para a segunda opção e estabilidade em vários quadros. O modo de movimento compara sequências gravadas; Ç, H, J, K, X, Y e Z exigem pelo menos 5 exemplos variados por letra e mão. K também continua disponível no modo estático. O app ainda não entende sinais de vocabulário nem converte Libras em português gramatical.</p></section>
+    <footer><span>LIBRAS AI</span><span>Feito para aprender · Código aberto</span></footer>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<dialog class="guide-dialog" id="guideDialog" aria-labelledby="guideDialogTitle">
+    <button class="guide-close" id="closeGuide" type="button" aria-label="Fechar exemplo">×</button>
+    <div class="guide-dialog-content">
+        <img id="guideDialogImage" src="" alt="" />
+        <div><div class="eyebrow">ALFABETO MANUAL</div><h2 id="guideDialogTitle">Letra <span id="guideDialogLetter"></span></h2><p>Use esta imagem para se orientar. Posicione a mão inteira no quadro e mantenha a pose estável para a câmera reconhecer a letra.</p><p class="guide-dialog-status" id="guideDialogStatus"></p></div>
+    </div>
+</dialog>
